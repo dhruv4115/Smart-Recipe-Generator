@@ -1,19 +1,15 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
-// import { UsersModule } from './users/users.module';
-// import { AuthModule } from './auth/auth.module';
-// import { RecipesModule } from './recipes/recipes.module';
-// import { AiModule } from './ai/ai.module';
-// import { IngredientsModule } from './ingredients/ingredients.module';
-import { APP_FILTER, APP_PIPE } from '@nestjs/core';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { ValidationPipe } from './common/pipes/validation.pipe';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { RecipesModule } from './recipes/recipes.module';
+import { AiModule } from './ai/ai.module';
+import { IngredientsModule } from './ingredients/ingredients.module';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ValidationPipe } from './common/pipes/validation.pipe';
 
 @Module({
   imports: [
@@ -25,11 +21,12 @@ import { RecipesModule } from './recipes/recipes.module';
     UsersModule,
     AuthModule,
     RecipesModule,
-    // UsersModule,
-    // AuthModule,
-    // RecipesModule,
-    // AiModule,
-    // IngredientsModule,
+    IngredientsModule,
+    UsersModule,
+    AuthModule,
+    RecipesModule,
+    AiModule,
+    IngredientsModule,
   ],
   providers: [
     {
