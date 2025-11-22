@@ -11,6 +11,8 @@ import { DatabaseModule } from './database/database.module';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ValidationPipe } from './common/pipes/validation.pipe';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { ValidationPipe } from './common/pipes/validation.pipe';
       load: [configuration],
     }),
     DatabaseModule,
+    UsersModule,
+    AuthModule,
     // UsersModule,
     // AuthModule,
     // RecipesModule,
