@@ -80,5 +80,18 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
+  async getFavoritesWithRecipes(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .populate('favorites')
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException({ message: 'User not found' });
+    }
+
+    // favorites will be populated with Recipe documents
+    return user.favorites;
+  }
 
 }

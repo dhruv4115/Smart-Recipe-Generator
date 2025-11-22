@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RecipesService } from './recipes.service';
@@ -12,6 +13,8 @@ import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { QueryRecipesDto } from './dto/query-recipes.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { RecommendRecipesDto } from './dto/recommend-recipes.dto';
+import { RateRecipeDto } from './dto/rate-recipe.dto';
 
 @ApiTags('recipes')
 @Controller('recipes')
@@ -33,5 +36,36 @@ export class RecipesController {
   @ApiBearerAuth()
   async create(@Body() dto: CreateRecipeDto) {
     return this.recipesService.create(dto);
+  }
+
+  @Post('recommend')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async recommend(
+    @Req() req: any,
+    @Body() dto: RecommendRecipesDto,
+  ) {
+    return this.recipesService.recommend(req.user.userId, dto);
+  }
+
+  @Post(':id/rate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async rate(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: RateRecipeDto,
+  ) {
+    return this.recipesService.rateRecipe(req.user.userId, id, dto);
+  }
+
+  @Post(':id/favorite')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async toggleFavorite(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    return this.recipesService.toggleFavorite(req.user.userId, id);
   }
 }

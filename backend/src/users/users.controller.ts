@@ -35,4 +35,11 @@ export class UsersController {
     );
     return user.preferences;
   }
+  @Get('me/favorites')
+  async getFavorites(@Req() req: any) {
+    const favorites = await this.usersService.getFavoritesWithRecipes(
+      req.user.userId,
+    );
+    return { items: favorites };
+  }
 }
