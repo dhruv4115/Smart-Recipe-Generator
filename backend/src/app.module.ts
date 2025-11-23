@@ -22,11 +22,8 @@ import { ValidationPipe } from './common/pipes/validation.pipe';
     AuthModule,
     RecipesModule,
     IngredientsModule,
-    UsersModule,
-    AuthModule,
-    RecipesModule,
     AiModule,
-    IngredientsModule,
+    ConfigModule,
   ],
   providers: [
     {

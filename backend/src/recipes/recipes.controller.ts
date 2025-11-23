@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RecommendRecipesDto } from './dto/recommend-recipes.dto';
 import { RateRecipeDto } from './dto/rate-recipe.dto';
+import { SubstitutionRequestDto } from './dto/substitution-request.dto';
 
 @ApiTags('recipes')
 @Controller('recipes')
@@ -67,5 +68,20 @@ export class RecipesController {
     @Param('id') id: string,
   ) {
     return this.recipesService.toggleFavorite(req.user.userId, id);
+  }
+
+  @Post(':id/substitutions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async substitutions(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: SubstitutionRequestDto,
+  ) {
+    return this.recipesService.getSubstitutions(
+      req.user.userId,
+      id,
+      dto,
+    );
   }
 }

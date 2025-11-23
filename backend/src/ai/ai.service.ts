@@ -20,40 +20,255 @@ export class AiService {
     private readonly configService: ConfigService,
   ) {}
 
-  // ---- Nutritional estimates (LLM – placeholder for now) ----
+
+  // --------------------------------------
+// Gemini fallback embedding
+// --------------------------------------
+  async getGeminiEmbedding(text: string): Promise<number[]> {
+  const apiKey = this.configService.get<string>('gemini.apiKey');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/embed-text-1:embedText?key=${apiKey}`;
+
+  try {
+    const response$ = this.httpService.post(
+      url,
+      { text },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    const res = await firstValueFrom(response$);
+
+    const embedding = res?.data?.embedding?.value
+                  || res?.data?.embedding?.values;
+
+    if (!embedding || !Array.isArray(embedding)) {
+      this.logger.error("Gemini embedding unexpected response", res.data);
+      throw new InternalServerErrorException({
+        message: "Gemini embedding bad response",
+        code: "GEMINI_BAD_RESPONSE",
+      });
+    }
+
+    return embedding;
+  } catch (err: any) {
+    this.logger.error("Error calling Gemini embedding API:", err?.response?.data || err.message);
+    throw new InternalServerErrorException({
+      message: "Failed to generate embedding",
+      code: "EMBEDDING_CALL_FAILED",
+    });
+  }
+}
+
+
+  // ---------- Embeddings ----------
+
+  async getEmbedding(text: string): Promise<number[]> {
+  const baseUrl = this.configService.get('embeddings.baseUrl');
+  const apiKey = this.configService.get('embeddings.apiKey');
+
+  const url = `${baseUrl}?key=${apiKey}`;
+
+  try {
+    const response$ = this.httpService.post(
+      url,
+      {
+        content: {
+          parts: [
+            { text }
+          ]
+        }
+      },
+      {
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+
+    const response = await firstValueFrom(response$);
+    const values = response.data?.embedding?.values;
+
+    if (!Array.isArray(values)) {
+      throw new Error("Bad embedding API response");
+    }
+
+    return values;
+  } catch (err) {
+    this.logger.error("Error calling embedding API", err?.response?.data || err);
+    throw new InternalServerErrorException({
+      message: "Failed to generate embedding",
+      code: "EMBEDDING_CALL_FAILED",
+    });
+  }
+}
+
+
+
+  // ---------- LLM: chat/completions helper ----------
+
+  private async callChatModel(prompt: string): Promise<string> {
+    const baseUrl = this.configService.get<string>('llm.baseUrl');
+    const apiKey = this.configService.get<string>('llm.apiKey');
+    const model = this.configService.get<string>('llm.model');
+
+    if (!baseUrl || !apiKey || !model) {
+      this.logger.error('LLM API config missing');
+      throw new InternalServerErrorException({
+        message: 'LLM API is not configured',
+        code: 'LLM_CONFIG_MISSING',
+      });
+    }
+
+    try {
+      const response$ = this.httpService.post(
+        baseUrl,
+        {
+          model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a helpful assistant for a recipe app. Always respond ONLY with valid JSON.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          // OpenAI-specific field; if your provider doesn’t support it, remove it.
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      const response = await firstValueFrom(response$);
+      const data = response.data;
+
+      const content =
+        data?.choices?.[0]?.message?.content ??
+        JSON.stringify({ error: 'No content' });
+
+      return content;
+    } catch (error: any) {
+      this.logger.error(
+        'Error calling LLM API',
+        error?.response?.data || error.message,
+      );
+      throw new InternalServerErrorException({
+        message: 'Failed to call LLM API',
+        code: 'LLM_CALL_FAILED',
+      });
+    }
+  }
+
+  // ---- Nutritional estimates (LLM) ----
   async getNutritionEstimate(
     ingredients: string[],
     servings: number,
   ): Promise<NutritionInfo> {
-    // TODO: implement using LLM API
-    // For now, returning dummy values so other parts of the system work.
-    return {
-      calories: 400,
-      protein: 20,
-      carbs: 50,
-      fat: 10,
-      perServing: true,
-    };
+    const prompt = `You are a nutrition assistant. Estimate approximate nutrition per serving for a recipe.
+                    Ingredients: ${ingredients.join(', ')}
+                    Number of servings: ${servings}
+
+                    Return a JSON object with this exact structure (numbers in grams or kcal per serving):
+
+                    {
+                    "calories": number,
+                    "protein": number,
+                    "carbs": number,
+                    "fat": number,
+                    "perServing": true
+                    }`;
+    try {
+      const content = await this.callChatModel(prompt);
+      const parsed = JSON.parse(content);
+
+      const result: NutritionInfo = {
+        calories: Number(parsed.calories) || 0,
+        protein: Number(parsed.protein) || 0,
+        carbs: Number(parsed.carbs) || 0,
+        fat: Number(parsed.fat) || 0,
+        perServing: true,
+      };
+
+      return result;
+    } catch (error: any) {
+      this.logger.error(
+        'Failed to parse nutrition estimate from LLM',
+        error?.message,
+      );
+      // Fallback to safe defaults so the app still works
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        perServing: true,
+      };
+    }
   }
 
-  // ---- Substitution suggestions (LLM – placeholder for now) ----
+  // ---- Substitution suggestions ----
   async getSubstitutionSuggestions(
     ingredients: string[],
     dietaryPreferences: string[],
+    allergies: string[],
   ): Promise<{ substitutions: any[]; notes: string }> {
-    // TODO: implement using LLM API
-    return {
-      substitutions: [],
-      notes: 'Substitution suggestions not yet implemented',
-    };
+    const prompt = `
+        You are a culinary expert helping with ingredient substitutions.
+
+        Ingredients in the recipe: ${ingredients.join(', ')}
+        User dietary preferences: ${dietaryPreferences.join(', ') || 'none'}
+        User allergies: ${allergies.join(', ') || 'none'}
+
+        Suggest substitutions for ingredients that conflict with the dietary preferences or allergies.
+        Also suggest any improvements to make the recipe more suitable.
+
+        Return a JSON object with this exact structure:
+
+        {
+        "substitutions": [
+            {
+            "original": "butter",
+            "suggested": "olive oil",
+            "reason": "vegan, lactose-free"
+            }
+        ],
+        "notes": "Additional overall tips or remarks."
+        }
+        `;
+
+    try {
+      const content = await this.callChatModel(prompt);
+      const parsed = JSON.parse(content);
+
+      const substitutions = Array.isArray(parsed.substitutions)
+        ? parsed.substitutions
+        : [];
+      const notes =
+        typeof parsed.notes === 'string' ? parsed.notes : '';
+
+      return { substitutions, notes };
+    } catch (error: any) {
+      this.logger.error(
+        'Failed to parse substitution suggestions from LLM',
+        error?.message,
+      );
+      return {
+        substitutions: [],
+        notes: 'Could not generate substitution suggestions.',
+      };
+    }
   }
 
-  // ---- Embeddings (placeholder – to be wired to real embeddings API later) ----
-  async getEmbedding(text: string): Promise<number[]> {
-    // TODO: call embeddings API (OpenAI / HF) in Phase 7/8
-    // Placeholder embedding
-    return [0.1, 0.2, 0.3];
-  }
+
 
 // ---- Vision: detect ingredients from image (Structured JSON Output) ----
 async detectIngredientsFromImage(

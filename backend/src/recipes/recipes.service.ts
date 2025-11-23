@@ -16,6 +16,7 @@ import { UsersService } from '../users/users.service';
 import { computeRecommendationScore } from './utils/recommendation-score';
 import { cosineSimilarity } from './utils/similarity';
 import { normalizeIngredients } from '../common/utils/ingredients-normalizer';
+import { SubstitutionRequestDto } from './dto/substitution-request.dto';
 
 @Injectable()
 export class RecipesService {
@@ -406,5 +407,52 @@ export class RecipesService {
       await this.usersService.addFavorite(userId, recipeId);
       return { isFavorite: true };
     }
+  }
+  // ------------ SUBSTITUTIONS (LLM) -----------------
+
+  async getSubstitutions(
+    userId: string,
+    recipeId: string,
+    dto: SubstitutionRequestDto,
+  ) {
+    const recipe = await this.findById(recipeId);
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException({ message: 'User not found' });
+    }
+
+    const recipeIngredients = recipe.ingredients.map((i) => i.name);
+
+    const userDietPrefs = user.preferences?.dietaryPreferences || [];
+    const userAllergies = user.preferences?.allergies || [];
+
+    const combinedDietPrefs = Array.from(
+      new Set([
+        ...userDietPrefs,
+        ...(dto.dietaryPreferences || []),
+      ]),
+    );
+
+    const combinedAllergies = Array.from(
+      new Set([
+        ...userAllergies,
+        ...(dto.allergies || []),
+      ]),
+    );
+
+    const result = await this.aiService.getSubstitutionSuggestions(
+      recipeIngredients,
+      combinedDietPrefs,
+      combinedAllergies,
+    );
+
+    return {
+      recipeId,
+      ingredients: recipeIngredients,
+      dietaryPreferences: combinedDietPrefs,
+      allergies: combinedAllergies,
+      substitutions: result.substitutions,
+      notes: result.notes,
+    };
   }
 }
