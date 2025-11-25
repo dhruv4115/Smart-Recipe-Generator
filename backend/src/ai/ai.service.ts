@@ -347,7 +347,7 @@ async detectIngredientsFromImage(
       error?.response?.data || error.message,
     );
     throw new InternalServerErrorException({
-      message: 'Image is unclear, Failed to detect ingredients from image.Please upload a new image.',
+      message: 'Image is unclear, Failed to detect ingredients from image.Please upload a new image in jpeg and not in .webp.',
       code: 'VISION_CALL_FAILED',
     });
   }

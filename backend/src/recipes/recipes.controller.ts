@@ -60,15 +60,14 @@ export class RecipesController {
     return this.recipesService.rateRecipe(req.user.userId, id, dto);
   }
 
-  @Post(':id/favorite')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  async toggleFavorite(
-    @Req() req: any,
-    @Param('id') id: string,
-  ) {
-    return this.recipesService.toggleFavorite(req.user.userId, id);
-  }
+    @Post(':id/favorite')
+    async toggleFavorite(@Req() req, @Param('id') recipeId: string) {
+    const userId = req.user.userId || req.user.sub; // whichever your JWT uses
+
+    return this.recipesService.toggleFavorite(userId, recipeId);
+    }
+
 
   @Post(':id/substitutions')
   @UseGuards(JwtAuthGuard)
