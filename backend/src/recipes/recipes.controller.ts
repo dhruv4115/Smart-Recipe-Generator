@@ -28,10 +28,25 @@ export class RecipesController {
     return this.recipesService.findAll(query);
   }
 
-  @UseGuards(JwtAuthGuard)
+//   @UseGuards(JwtAuthGuard)
+//   @Post('generate')
+//   async generateRecipe(@Body() dto: GenerateRecipeDto, @Req() req: any) {
+//     const recipe = await this.recipesService.generateAndSave(dto);
+//     return recipe;
+//   }
+
+// @UseGuards(JwtAuthGuard)
+// @Post('generate-ai')
+// async generateRecipeWithAi(@Body() dto: GenerateRecipeDto, @Req() req: any) {
+// const recipe = await this.recipesService.generateAndSave(dto);
+// return recipe.toJSON ? recipe.toJSON() : recipe;
+// }
   @Post('generate')
+  @UseGuards(JwtAuthGuard)
   async generateRecipe(@Body() dto: GenerateRecipeDto, @Req() req: any) {
-    return this.recipesService.generateWithAi(dto);
+    const saved = await this.recipesService.generateAndSave(dto);
+    console.log('Generated & saved recipe with _id:', saved._id?.toString());
+    return saved.toJSON ? saved.toJSON() : saved;
   }
 
   @Get(':id')

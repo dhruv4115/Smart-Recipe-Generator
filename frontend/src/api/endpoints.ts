@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   GET_RECIPES: '/recipes',
   GET_SUBSTITUTIONS: (id: string) => `/recipes/${id}/substitutions`,
   RATE_RECIPE: (id: string) => `/recipes/${id}/rate`,
+  // GENERATE_RECIPE: '/recipes/generate',
   GENERATE_RECIPE: '/recipes/generate',
   
   // User

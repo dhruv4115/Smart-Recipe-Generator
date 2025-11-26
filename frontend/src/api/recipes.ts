@@ -177,7 +177,7 @@ export const recipesAPI = {
     );
     return data;
   },
-  
+
   generate: async (params: {
     ingredients: string[];
     dietaryPreferences?: string[];

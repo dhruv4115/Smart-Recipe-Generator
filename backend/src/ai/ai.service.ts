@@ -33,8 +33,8 @@ export interface GeneratedRecipe {
     fat: number;
     perServing: boolean;
   };
+  imageUrl?: string;
 }
-
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -43,6 +43,47 @@ export class AiService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {}
+
+  
+  getRecipeImageUrl(meta: {
+    title?: string;
+    cuisine?: string;
+    dietaryTags?: string[];
+  }): string {
+    const keywords: string[] = [];
+
+    if (meta.title) {
+      const cleanedTitle = meta.title
+        .toLowerCase()
+        .replace(/recipe|simple|easy|best|homemade/g, '')
+        .trim();
+      if (cleanedTitle) {
+        keywords.push(
+          ...cleanedTitle
+            .split(/\s+/)
+            .filter((w) => w.length > 2),
+        );
+      }
+    }
+
+    if (meta.cuisine) {
+      keywords.push(meta.cuisine.toLowerCase());
+    }
+
+    if (meta.dietaryTags && meta.dietaryTags.length > 0) {
+      keywords.push(meta.dietaryTags[0].toLowerCase());
+    }
+
+    if (keywords.length === 0) {
+      keywords.push('food');
+    }
+
+    const tagString = keywords.join(',');
+
+    return `https://loremflickr.com/800/600/${tagString}`;
+    // https://loremflickr.com/800/600/tomato,pasta,italian
+    // https://loremflickr.com/800/600/pizza
+  }
 
 
   // --------------------------------------
@@ -292,6 +333,39 @@ export class AiService {
     }
   }
 
+    // --------------------------------------
+    // Build Unsplash Image URL for recipes
+    // --------------------------------------
+    private buildImageUrlForRecipe(recipe: { title?: string; cuisine?: string; dietaryTags?: string[] }): string {
+        const keywords: string[] = [];
+
+        if (recipe.title) {
+            const cleanedTitle = recipe.title
+            .toLowerCase()
+            .replace(/recipe|simple|easy|best|homemade/g, '')
+            .replace(/[^a-zA-Z\s]/g, '')
+            .trim();
+
+            if (cleanedTitle) keywords.push(cleanedTitle);
+        }
+
+        if (recipe.cuisine) {
+            keywords.push(`${recipe.cuisine.toLowerCase()} food`);
+        }
+
+        if (recipe.dietaryTags && recipe.dietaryTags.length > 0) {
+            keywords.push(recipe.dietaryTags[0].toLowerCase());
+        }
+
+        if (keywords.length === 0) {
+            keywords.push("food");
+        }
+
+        const query = encodeURIComponent(keywords.join(','));
+        return `https://source.unsplash.com/featured/800x600/?${query}`;
+    }
+
+
   async generateRecipe(params: {
   ingredients: string[];
   dietaryPreferences?: string[];
@@ -388,12 +462,19 @@ Return ONLY valid JSON.
     let parsed: GeneratedRecipe;
     try {
         parsed = JSON.parse(cleaned);
-      } catch (jsonErr) {
+    } catch (jsonErr) {
         console.error('❌ JSON PARSE FAILED');
         console.error('RAW TEXT:', text);
         console.error('CLEANED TEXT:', cleaned);
         throw new InternalServerErrorException('AI returned invalid JSON');
-      }
+    }
+    if (!(parsed as any).imageUrl) {
+        (parsed as any).imageUrl = this.getRecipeImageUrl({
+            title: parsed.title,
+            cuisine: parsed.cuisine,
+            dietaryTags: parsed.dietaryTags,
+        });
+    }
 
       if (!parsed.nutrition) {
         throw new InternalServerErrorException('Missing nutrition in AI output');

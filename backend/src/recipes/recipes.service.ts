@@ -30,36 +30,107 @@ export class RecipesService {
 
   // ------------ BASIC CREATE / LIST / GET -----------------
 
-  async create(dto: CreateRecipeDto): Promise<RecipeDocument> {
-    let nutrition = dto.nutrition;
-    if (!nutrition) {
-      const ingredients = dto.ingredients.map((i) => i.name);
-      const estimated = await this.aiService.getNutritionEstimate(
-        ingredients,
-        dto.servings,
-      );
-      nutrition = {
-        calories: estimated.calories,
-        protein: estimated.protein,
-        carbs: estimated.carbs,
-        fat: estimated.fat,
-      };
-    }
+  async generateAndSave(dto: GenerateRecipeDto): Promise<RecipeDocument> {
+  const generated = await this.aiService.generateRecipe({
+    ingredients: dto.ingredients,
+    dietaryPreferences: dto.dietaryPreferences,
+    servings: dto.servings,
+  });
 
-    const recipe = new this.recipeModel({
-      ...dto,
-      nutrition: {
-        ...nutrition,
-        perServing: true,
-      },
+  const createDto: CreateRecipeDto = {
+    title: generated.title,
+    description: generated.description,
+    ingredients: generated.ingredients,
+    steps: generated.steps,
+    cuisine: generated.cuisine,
+    difficulty: generated.difficulty,
+    cookingTimeMinutes: generated.cookingTimeMinutes,
+    servings: generated.servings,
+    dietaryTags: generated.dietaryTags,
+    imageUrl: generated.imageUrl,
+    nutrition: generated.nutrition,
+  };
+
+  let nutrition = createDto.nutrition;
+  if (!nutrition) {
+    const ingredients = createDto.ingredients.map((i) => i.name);
+    const estimated = await this.aiService.getNutritionEstimate(
+      ingredients,
+      createDto.servings,
+    );
+    nutrition = {
+      calories: estimated.calories,
+      protein: estimated.protein,
+      carbs: estimated.carbs,
+      fat: estimated.fat,
+    };
+  }
+
+  const recipe = new this.recipeModel({
+    ...createDto,
+    nutrition: {
+      ...nutrition,
+      perServing: true,
+    },
+  });
+
+  const ingredientsText = createDto.ingredients.map((i) => i.name).join(', ');
+  recipe.embeddingVector = await this.aiService.getEmbedding(ingredientsText);
+
+  recipe.imageUrl =
+    createDto.imageUrl ||
+    this.aiService.getRecipeImageUrl({
+      title: createDto.title,
+      cuisine: createDto.cuisine,
+      dietaryTags: createDto.dietaryTags,
     });
 
-    // Embedding for recipe ingredients text
-    const ingredientsText = dto.ingredients.map((i) => i.name).join(', ');
-    recipe.embeddingVector = await this.aiService.getEmbedding(ingredientsText);
+  const saved = await recipe.save();
+  console.log('generateAndSave() created recipe with _id:', saved._id?.toString());
+  return saved;
+}
 
-    return recipe.save();
+
+  async create(dto: CreateRecipeDto): Promise<RecipeDocument> {
+  let nutrition = dto.nutrition;
+  if (!nutrition) {
+    const ingredients = dto.ingredients.map((i) => i.name);
+    const estimated = await this.aiService.getNutritionEstimate(
+      ingredients,
+      dto.servings,
+    );
+    nutrition = {
+      calories: estimated.calories,
+      protein: estimated.protein,
+      carbs: estimated.carbs,
+      fat: estimated.fat,
+    };
   }
+
+  const recipe = new this.recipeModel({
+    ...dto,
+    nutrition: {
+      ...nutrition,
+      perServing: true,
+    },
+  });
+
+  const ingredientsText = dto.ingredients.map((i) => i.name).join(', ');
+  recipe.embeddingVector = await this.aiService.getEmbedding(ingredientsText);
+
+  const imageUrl =
+    dto.imageUrl ||
+    this.aiService.getRecipeImageUrl({
+      title: dto.title,
+      cuisine: dto.cuisine,
+      dietaryTags: dto.dietaryTags,
+    });
+
+  recipe.imageUrl = imageUrl; // <-- important
+
+  return recipe.save();
+}
+
 
   async findAll(query: QueryRecipesDto) {
     const page = parseInt(query.page || '1', 10);
