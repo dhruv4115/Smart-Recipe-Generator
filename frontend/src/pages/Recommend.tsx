@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { recipesAPI } from '@/api/recipes';
+import { Recipe, recipesAPI } from '@/api/recipes';
 import { userAPI } from '@/api/user';
 import { RecipeCard } from '@/components/RecipeCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -24,6 +24,9 @@ export default function Recommend() {
   const [servings, setServings] = useState('4');
   const [hasSearched, setHasSearched] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const [generatedRecipe, setGeneratedRecipe] = useState<Recipe | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
 
   // Load ingredients from navigation state (from Upload page)
   useEffect(() => {
@@ -100,6 +103,36 @@ export default function Recommend() {
       toast.error('Failed to update favorites');
     }
   };
+
+  const handleGenerateRecipe = async () => {
+    if (ingredients.length === 0) {
+      toast.error('Please add at least one ingredient');
+      return;
+    }
+    if (!isAuthenticated) {
+      toast.error('Please login to use AI recipe generation');
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      setGeneratedRecipe(null);
+
+      const recipe = await recipesAPI.generate({
+        ingredients,
+        dietaryPreferences: preferences?.dietaryPreferences,
+        servings: servings ? parseInt(servings) : undefined,
+      });
+
+      setGeneratedRecipe(recipe);
+      toast.success('AI recipe generated!');
+    } catch (err) {
+      toast.error('Failed to generate recipe');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary/5 to-secondary/5">
@@ -201,10 +234,59 @@ export default function Recommend() {
                 <Sparkles className="mr-2 h-4 w-4" />
                 Get Recommendations
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleGenerateRecipe}
+                className="w-full mt-2"
+                disabled={ingredients.length === 0 || isGenerating}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isGenerating ? 'Generating...' : 'Generate New Recipe with AI'}
+              </Button>
+
             </CardContent>
           </Card>
 
+          
+
           <div className="lg:col-span-2">
+            {generatedRecipe && (
+              <div className="mb-8">
+                <Card className="border-primary/40 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle>AI Generated Recipe</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RecipeCard
+                      recipe={generatedRecipe}
+                      onFavorite={handleFavorite}
+                    />
+
+                    {/* Nutrition block if available */}
+                    {generatedRecipe.nutrition && (
+                      <div className="mt-4 text-sm text-muted-foreground">
+                        <p>
+                          <span className="font-medium">Calories:</span>{' '}
+                          {generatedRecipe.nutrition.calories} kcal
+                        </p>
+                        <p>
+                          <span className="font-medium">Protein:</span>{' '}
+                          {generatedRecipe.nutrition.protein} g
+                        </p>
+                        <p>
+                          <span className="font-medium">Carbs:</span>{' '}
+                          {generatedRecipe.nutrition.carbs} g
+                        </p>
+                        <p>
+                          <span className="font-medium">Fat:</span>{' '}
+                          {generatedRecipe.nutrition.fat} g
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
             {isLoading ? (
               <div className="flex items-center justify-center min-h-[400px]">
                 <LoadingSpinner size="lg" text="Finding perfect recipes..." />

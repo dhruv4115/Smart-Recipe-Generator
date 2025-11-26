@@ -177,4 +177,13 @@ export const recipesAPI = {
     );
     return data;
   },
+  
+  generate: async (params: {
+    ingredients: string[];
+    dietaryPreferences?: string[];
+    servings?: number;
+  }): Promise<Recipe> => {
+    const { data } = await axiosInstance.post(API_ENDPOINTS.GENERATE_RECIPE, params);
+    return data;
+  },
 };
