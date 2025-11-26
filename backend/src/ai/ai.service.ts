@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +10,29 @@ export interface NutritionInfo {
   carbs: number;
   fat: number;
   perServing: boolean;
+}
+
+export interface GeneratedRecipe {
+  title: string;
+  description: string;
+  ingredients: {
+    name: string;
+    quantity: number;
+    unit: string;
+  }[];
+  steps: string[];
+  cuisine?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  cookingTimeMinutes: number;
+  servings: number;
+  dietaryTags: string[];
+  nutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    perServing: boolean;
+  };
 }
 
 @Injectable()
@@ -267,6 +291,123 @@ export class AiService {
       };
     }
   }
+
+  async generateRecipe(params: {
+  ingredients: string[];
+  dietaryPreferences?: string[];
+  servings?: number;
+}): Promise<GeneratedRecipe> {
+
+  const apiKey = this.configService.get<string>('LLM.apiKey');
+  const baseUrl = this.configService.get<string>('LLM.baseUrl');
+  const model = this.configService.get<string>('LLM.model');
+
+  if (!apiKey || !baseUrl || !model) {
+    throw new InternalServerErrorException('LLM config missing');
+  }
+  console.log("🔥 GENERATE RECIPE FUNCTION LOADED");
+
+
+  // ⭐ THE ONLY CORRECT URL FOR GEMINI 2.0 FLASH
+  const url = `${baseUrl}/${model}:generateContent?key=${apiKey}`;
+  console.log("🔥 FINAL URL:", url);
+
+  const servings = params.servings ?? 4;
+  const prefs = params.dietaryPreferences?.join(', ') || 'none';
+
+  const systemPrompt = `
+You are an expert chef and nutritionist. Generate a recipe STRICTLY as JSON.
+
+{
+  "title": string,
+  "description": string,
+  "ingredients": { "name": string, "quantity": number, "unit": string }[],
+  "steps": string[],
+  "cuisine": string,
+  "difficulty": "easy" | "medium" | "hard",
+  "cookingTimeMinutes": number,
+  "servings": number,
+  "dietaryTags": string[],
+  "nutrition": {
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fat": number,
+    "perServing": true
+  }
+}
+
+Return ONLY JSON.
+  `.trim();
+
+  const userPrompt = `
+Ingredients: ${params.ingredients.join(', ')}
+Dietary preferences: ${prefs}
+Servings: ${servings}
+
+Generate ONE recipe.
+Return ONLY valid JSON.
+  `.trim();
+
+  // ⭐ GEMINI FORMAT — MUST USE contents + parts
+  const payload = {
+    contents: [
+      {
+        parts: [
+          { text: systemPrompt },
+          { text: userPrompt }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 2048
+    }
+  };
+
+
+  try {
+    const response = await axios.post(url, payload, {
+      headers: { "Content-Type": "application/json" }
+    });
+
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      console.error("Gemini Response Error", response.data);
+      throw new InternalServerErrorException('AI returned empty response');
+    }
+
+    const cleaned = text
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
+    console.log("🔥 CLEANED JSON:", cleaned);
+
+    let parsed: GeneratedRecipe;
+    try {
+        parsed = JSON.parse(cleaned);
+      } catch (jsonErr) {
+        console.error('❌ JSON PARSE FAILED');
+        console.error('RAW TEXT:', text);
+        console.error('CLEANED TEXT:', cleaned);
+        throw new InternalServerErrorException('AI returned invalid JSON');
+      }
+
+      if (!parsed.nutrition) {
+        throw new InternalServerErrorException('Missing nutrition in AI output');
+      }
+
+      return parsed;
+
+  } catch (err) {
+    console.error("GEMINI ERROR >>>>", err.response?.data || err);
+    throw new InternalServerErrorException('Failed generating recipe');
+  }
+}
+
+
 
 
 

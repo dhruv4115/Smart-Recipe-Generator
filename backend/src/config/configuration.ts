@@ -40,6 +40,11 @@ export default () => ({
     apiKey: process.env.LLM_API_KEY,
     model: process.env.LLM_MODEL,
   },
+  LLM: {
+    baseUrl: process.env.llm_API_BASE_URL,
+    apiKey: process.env.llm_API_KEY,
+    model: process.env.llm_MODEL,
+  },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
   },

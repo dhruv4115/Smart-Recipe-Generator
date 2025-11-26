@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RecommendRecipesDto } from './dto/recommend-recipes.dto';
 import { RateRecipeDto } from './dto/rate-recipe.dto';
 import { SubstitutionRequestDto } from './dto/substitution-request.dto';
+import { GenerateRecipeDto } from './dto/generate-recipe.dto';
 
 @ApiTags('recipes')
 @Controller('recipes')
@@ -25,6 +26,12 @@ export class RecipesController {
   @Get()
   async findAll(@Query() query: QueryRecipesDto) {
     return this.recipesService.findAll(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('generate')
+  async generateRecipe(@Body() dto: GenerateRecipeDto, @Req() req: any) {
+    return this.recipesService.generateWithAi(dto);
   }
 
   @Get(':id')

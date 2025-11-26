@@ -11,12 +11,13 @@ import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { QueryRecipesDto } from './dto/query-recipes.dto';
 import { RecommendRecipesDto } from './dto/recommend-recipes.dto';
 import { RateRecipeDto } from './dto/rate-recipe.dto';
-import { AiService } from '../ai/ai.service';
+import { AiService, GeneratedRecipe } from '../ai/ai.service';
 import { UsersService } from '../users/users.service';
 import { computeRecommendationScore } from './utils/recommendation-score';
 import { cosineSimilarity } from './utils/similarity';
 import { normalizeIngredients } from '../common/utils/ingredients-normalizer';
 import { SubstitutionRequestDto } from './dto/substitution-request.dto';
+import { GenerateRecipeDto } from './dto/generate-recipe.dto';
 
 @Injectable()
 export class RecipesService {
@@ -377,6 +378,14 @@ export class RecipesService {
       averageRating: recipe.averageRating,
       ratingCount: recipe.ratingCount,
     };
+  }
+
+  async generateWithAi(dto: GenerateRecipeDto): Promise<GeneratedRecipe> {
+    return this.aiService.generateRecipe({
+      ingredients: dto.ingredients,
+      dietaryPreferences: dto.dietaryPreferences,
+      servings: dto.servings,
+    });
   }
 
   // ------------ FAVORITES (TOGGLE) -----------------
